@@ -40,7 +40,7 @@ export class UnitreeWebRTCConnection {
             // Fetch token if not provided and credentials available
             if (!this.token && this.username && this.password) {
                 const { fetch_token } = await import("../core/util")
-                this.token = await fetch_token(this.username, this.password) || ""
+                this.token = (await fetch_token(this.username, this.password)) || ""
             }
             const public_key = await fetch_public_key()
             if (!public_key) throw new Error("Failed to fetch public key")

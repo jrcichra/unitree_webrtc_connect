@@ -69,7 +69,14 @@ interface FileMessage extends BaseMessage {
     }
 }
 
-type WebRTCMessage = BaseMessage | ValidationMessage | RTCInnerReqMessage | HeartbeatMessage | ErrorMessage | DataMessage | FileMessage
+type WebRTCMessage =
+    | BaseMessage
+    | ValidationMessage
+    | RTCInnerReqMessage
+    | HeartbeatMessage
+    | ErrorMessage
+    | DataMessage
+    | FileMessage
 
 interface PublishOptions {
     id?: string | number
@@ -113,16 +120,12 @@ class FutureResolver {
 
         const identifier = String(
             get_nested_field(message as Record<string, unknown>, "data", "uuid") ||
-            get_nested_field(message as Record<string, unknown>, "data", "header", "identity", "id") ||
-            get_nested_field(message as Record<string, unknown>, "info", "uuid") ||
-            get_nested_field(message as Record<string, unknown>, "info", "req_uuid") ||
-            ""
+                get_nested_field(message as Record<string, unknown>, "data", "header", "identity", "id") ||
+                get_nested_field(message as Record<string, unknown>, "info", "uuid") ||
+                get_nested_field(message as Record<string, unknown>, "info", "req_uuid") ||
+                ""
         )
-        const key = this.generateMessageKey(
-            message.type as string,
-            (message as BaseMessage).topic || "",
-            identifier
-        )
+        const key = this.generateMessageKey(message.type as string, (message as BaseMessage).topic || "", identifier)
 
         const contentInfo = get_nested_field(message, "data", "content_info") as ContentInfo | undefined
         if (contentInfo && contentInfo.enable_chunking) {
@@ -146,7 +149,9 @@ class FutureResolver {
                 return
             } else {
                 this.chunkDataStorage[key].push(dataChunk)
-                ;(message as DataMessage).data!.data = this.mergeArrayBuffers(this.chunkDataStorage[key])
+                if ((message as DataMessage).data) {
+                    ;(message as DataMessage).data.data = this.mergeArrayBuffers(this.chunkDataStorage[key])
+                }
                 delete this.chunkDataStorage[key]
             }
         }
@@ -164,16 +169,12 @@ class FutureResolver {
     private runResolveForTopicForFile(message: FileMessage) {
         const identifier = String(
             get_nested_field(message as Record<string, unknown>, "data", "uuid") ||
-            get_nested_field(message as Record<string, unknown>, "data", "header", "identity", "id") ||
-            get_nested_field(message as Record<string, unknown>, "info", "uuid") ||
-            get_nested_field(message as Record<string, unknown>, "info", "req_uuid") ||
-            ""
+                get_nested_field(message as Record<string, unknown>, "data", "header", "identity", "id") ||
+                get_nested_field(message as Record<string, unknown>, "info", "uuid") ||
+                get_nested_field(message as Record<string, unknown>, "info", "req_uuid") ||
+                ""
         )
-        const key = this.generateMessageKey(
-            message.type as string,
-            message.topic || "",
-            identifier
-        )
+        const key = this.generateMessageKey(message.type as string, message.topic || "", identifier)
 
         const fileInfo = get_nested_field(message, "info", "file") as FileInfo | undefined
         if (fileInfo && fileInfo.enable_chunking) {
@@ -190,16 +191,18 @@ class FutureResolver {
             const dataChunk = fileInfo.data
             if (this.chunkDataStorage[key]) {
                 this.chunkDataStorage[key].push(
-                    typeof dataChunk === "string" ? new TextEncoder().encode(dataChunk) : dataChunk as Uint8Array
+                    typeof dataChunk === "string" ? new TextEncoder().encode(dataChunk) : (dataChunk as Uint8Array)
                 )
             } else {
                 this.chunkDataStorage[key] = [
-                    typeof dataChunk === "string" ? new TextEncoder().encode(dataChunk) : dataChunk as Uint8Array,
+                    typeof dataChunk === "string" ? new TextEncoder().encode(dataChunk) : (dataChunk as Uint8Array),
                 ]
             }
 
             if (chunkIndex === totalChunks) {
-                message.info!.file!.data = new Uint8Array(this.mergeArrayBuffers(this.chunkDataStorage[key]))
+                if (message.info && message.info.file) {
+                    message.info.file.data = new Uint8Array(this.mergeArrayBuffers(this.chunkDataStorage[key]))
+                }
                 delete this.chunkDataStorage[key]
             }
         }
@@ -663,7 +666,9 @@ class WebRTCDataChannelFileDownloader {
             }
 
             // The complete data should be merged in the FutureResolver
-            const completeData = (((response as Record<string, unknown>).info as Record<string, unknown>)?.file as Record<string, unknown>)?.data
+            const completeData = (
+                ((response as Record<string, unknown>).info as Record<string, unknown>)?.file as Record<string, unknown>
+            )?.data
 
             if (!completeData) {
                 throw new Error("Failed to get the file data.")
@@ -880,7 +885,9 @@ export class WebRTCDataChannel {
         } else if (msg_type === DATA_CHANNEL_TYPE.HEARTBEAT) {
             this.heartbeat.handleResponse(msg)
         } else if (
-            msg_type === DATA_CHANNEL_TYPE.ERRORS || msg_type === DATA_CHANNEL_TYPE.ADD_ERROR || msg_type === DATA_CHANNEL_TYPE.RM_ERROR
+            msg_type === DATA_CHANNEL_TYPE.ERRORS ||
+            msg_type === DATA_CHANNEL_TYPE.ADD_ERROR ||
+            msg_type === DATA_CHANNEL_TYPE.RM_ERROR
         ) {
             handle_error(msg)
         } else if (msg_type === DATA_CHANNEL_TYPE.ERR) {

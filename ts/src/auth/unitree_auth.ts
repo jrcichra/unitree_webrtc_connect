@@ -21,13 +21,7 @@ export async function decrypt_con_notify_data(encrypted_b64: string): Promise<st
         const keyBytes = new Uint8Array([232, 86, 130, 189, 22, 84, 155, 0, 142, 4, 166, 104, 43, 179, 235, 227])
 
         // Import key for AES-GCM
-        const key = await webcrypto.subtle.importKey(
-            "raw",
-            keyBytes,
-            { name: "AES-GCM" },
-            false,
-            ["decrypt"]
-        )
+        const key = await webcrypto.subtle.importKey("raw", keyBytes, { name: "AES-GCM" }, false, ["decrypt"])
 
         // Decrypt using AES-GCM
         const decrypted = await webcrypto.subtle.decrypt(
