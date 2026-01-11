@@ -1,5 +1,6 @@
 import CryptoJS from "crypto-js"
 import * as forge from "node-forge"
+import { webcrypto } from "crypto"
 import { aes_encrypt, generate_aes_key, rsa_encrypt, aes_decrypt, rsa_load_public_key } from "../core/encryption"
 
 export async function decrypt_con_notify_data(encrypted_b64: string): Promise<string> {
@@ -12,20 +13,37 @@ export async function decrypt_con_notify_data(encrypted_b64: string): Promise<st
         }
 
         // Extract components (same format as Python)
-        // const tag = encryptedData.slice(-16) // Last 16 bytes = GCM tag
-        // const nonce = encryptedData.slice(-28, -16) // Next 12 bytes = nonce
-        // const ciphertext = encryptedData.slice(0, -28) // Rest = ciphertext
+        const tag = encryptedData.slice(-16) // Last 16 bytes = GCM tag
+        const nonce = encryptedData.slice(-28, -16) // Next 12 bytes = nonce
+        const ciphertext = encryptedData.slice(0, -28) // Rest = ciphertext
 
-        // For now, return a placeholder - full Web Crypto API implementation would require:
-        // 1. AES-GCM key derivation from hardcoded key
-        // 2. Proper GCM decryption with tag verification
-        // 3. Error handling for authentication failures
+        // Hardcoded key from Python code
+        const keyBytes = new Uint8Array([232, 86, 130, 189, 22, 84, 155, 0, 142, 4, 166, 104, 43, 179, 235, 227])
 
-        console.warn("AES-GCM decryption placeholder - needs full Web Crypto API implementation")
-        return "decryption_placeholder"
+        // Import key for AES-GCM
+        const key = await webcrypto.subtle.importKey(
+            "raw",
+            keyBytes,
+            { name: "AES-GCM" },
+            false,
+            ["decrypt"]
+        )
+
+        // Decrypt using AES-GCM
+        const decrypted = await webcrypto.subtle.decrypt(
+            {
+                name: "AES-GCM",
+                iv: nonce,
+                tagLength: 128, // 16 bytes * 8
+            },
+            key,
+            new Uint8Array([...ciphertext, ...tag]) // Combine ciphertext and tag
+        )
+
+        return new TextDecoder().decode(decrypted)
     } catch (error) {
         console.error("AES-GCM decryption failed:", error)
-        throw new Error("AES-GCM decryption not fully implemented yet")
+        throw new Error("AES-GCM decryption failed")
     }
 }
 

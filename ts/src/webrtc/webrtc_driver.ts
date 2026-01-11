@@ -13,6 +13,8 @@ export class UnitreeWebRTCConnection {
     connectionMethod: WebRTCConnectionMethod
     isConnected: boolean = false
     token: string = ""
+    username?: string
+    password?: string
 
     datachannel!: WebRTCDataChannel
     audio!: WebRTCAudioChannel
@@ -28,15 +30,18 @@ export class UnitreeWebRTCConnection {
         this.sn = serialNumber || null
         this.ip = ip || null
         this.connectionMethod = connectionMethod
-        if (username && password) {
-            // Note: fetch_token is async, but constructor can't be async
-            // We'll call it in connect()
-        }
+        this.username = username
+        this.password = password
     }
 
     async connect(): Promise<void> {
         print_status("WebRTC connection", "🟡 started")
         if (this.connectionMethod === WebRTCConnectionMethod.Remote) {
+            // Fetch token if not provided and credentials available
+            if (!this.token && this.username && this.password) {
+                const { fetch_token } = await import("../core/util")
+                this.token = await fetch_token(this.username, this.password) || ""
+            }
             const public_key = await fetch_public_key()
             if (!public_key) throw new Error("Failed to fetch public key")
             if (!this.sn) throw new Error("Serial number required for remote connection")
