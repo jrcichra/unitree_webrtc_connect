@@ -4,15 +4,16 @@ import { UnifiedLidarDecoder } from "../lidar/lidar_decoder"
 
 // Future resolver for handling async responses
 class FutureResolver {
-    private pendingResponses: { [key: string]: Promise<any>[] } = {}
-    private pendingCallbacks: { [key: string]: { resolve: (value: any) => void; reject: (reason?: any) => void }[] } =
-        {}
+    private pendingResponses: { [key: string]: Promise<unknown>[] } = {}
+    private pendingCallbacks: {
+        [key: string]: { resolve: (value: unknown) => void; reject: (reason?: unknown) => void }[]
+    } = {}
     private chunkDataStorage: { [key: string]: Uint8Array[] } = {}
 
     saveResolve(
         messageType: string,
         topic: string,
-        resolver: { resolve: (value: any) => void; reject: (reason?: any) => void },
+        resolver: { resolve: (value: unknown) => void; reject: (reason?: unknown) => void },
         identifier: string
     ) {
         const key = identifier || `${messageType}$${topic}`
@@ -23,7 +24,7 @@ class FutureResolver {
         }
     }
 
-    runResolveForTopic(message: Record<string, any>) {
+    runResolveForTopic(message: Record<string, unknown>) {
         if (!message.type) return
 
         if (
@@ -73,14 +74,14 @@ class FutureResolver {
         if (this.pendingCallbacks[key]) {
             for (const future of this.pendingCallbacks[key]) {
                 if (future) {
-                    ;(future as any).resolve(message)
+                    ;(future as unknown).resolve(message)
                 }
             }
             delete this.pendingCallbacks[key]
         }
     }
 
-    private runResolveForTopicForFile(message: any) {
+    private runResolveForTopicForFile(message: unknown) {
         const key = this.generateMessageKey(
             message.type,
             message.topic || "",
@@ -122,7 +123,7 @@ class FutureResolver {
         if (this.pendingCallbacks[key]) {
             for (const future of this.pendingCallbacks[key]) {
                 if (future) {
-                    ;(future as any).resolve(message)
+                    ;(future as unknown).resolve(message)
                 }
             }
             delete this.pendingCallbacks[key]
@@ -149,14 +150,14 @@ class FutureResolver {
 class WebRTCDataChannelPubSub {
     private channel: RTCDataChannel
     private futureResolver: FutureResolver
-    private subscriptions: { [topic: string]: (message: any) => void } = {}
+    private subscriptions: { [topic: string]: (message: unknown) => void } = {}
 
     constructor(channel: RTCDataChannel) {
         this.channel = channel
         this.futureResolver = new FutureResolver()
     }
 
-    runResolve(message: any) {
+    runResolve(message: unknown) {
         this.futureResolver.runResolveForTopic(message)
 
         const topic = message.topic
@@ -165,10 +166,10 @@ class WebRTCDataChannelPubSub {
         }
     }
 
-    async publish(topic: string, data: any = null, msgType: string = DATA_CHANNEL_TYPE.MSG): Promise<any> {
+    async publish(topic: string, data: unknown = null, msgType: string = DATA_CHANNEL_TYPE.MSG): Promise<unknown> {
         return new Promise((resolve, reject) => {
             if (this.channel.readyState === "open") {
-                const messageDict: any = {
+                const messageDict: unknown = {
                     type: msgType,
                     topic: topic,
                 }
@@ -193,9 +194,9 @@ class WebRTCDataChannelPubSub {
         })
     }
 
-    publishWithoutCallback(topic: string, data: any = null, msgType: string = DATA_CHANNEL_TYPE.MSG) {
+    publishWithoutCallback(topic: string, data: unknown = null, msgType: string = DATA_CHANNEL_TYPE.MSG) {
         if (this.channel.readyState === "open") {
-            const messageDict: any = {
+            const messageDict: unknown = {
                 type: msgType,
                 topic: topic,
             }
@@ -212,14 +213,14 @@ class WebRTCDataChannelPubSub {
         }
     }
 
-    async publishRequestNew(topic: string, options: any = {}): Promise<any> {
+    async publishRequestNew(topic: string, options: unknown = {}): Promise<unknown> {
         const generatedId = (Date.now() % 2147483648) + Math.floor(Math.random() * 1000)
 
         if (!options || !options.api_id) {
             throw new Error("Please provide app id")
         }
 
-        const requestPayload: any = {
+        const requestPayload: unknown = {
             header: {
                 identity: {
                     id: options.id || generatedId,
@@ -243,7 +244,7 @@ class WebRTCDataChannelPubSub {
         return this.publish(topic, requestPayload, DATA_CHANNEL_TYPE.REQUEST)
     }
 
-    subscribe(topic: string, callback?: (message: any) => void) {
+    subscribe(topic: string, callback?: (message: unknown) => void) {
         if (this.channel.readyState !== "open") {
             console.error("Error: Data channel is not open")
             return
@@ -268,9 +269,9 @@ class WebRTCDataChannelPubSub {
 
 class WebRTCDataChannelHeartBeat {
     private channel: RTCDataChannel
-    private publish: (topic: string, data: any, type: string) => void
+    private publish: (topic: string, data: unknown, type: string) => void
     private heartbeatTimer: number | null = null
-    private heartbeatResponse: any = null
+    private heartbeatResponse: unknown = null
 
     constructor(channel: RTCDataChannel, pub_sub: WebRTCDataChannelPubSub) {
         this.channel = channel
@@ -306,7 +307,7 @@ class WebRTCDataChannelHeartBeat {
         }
     }
 
-    handleResponse(_message: any): void {
+    handleResponse(_message: unknown): void {
         this.heartbeatResponse = Date.now() / 1000
         console.log("Heartbeat response received.")
     }
@@ -314,7 +315,7 @@ class WebRTCDataChannelHeartBeat {
 
 class WebRTCDataChannelValidation {
     private channel: RTCDataChannel
-    private publish: (topic: string, data: any, type: string) => Promise<any>
+    private publish: (topic: string, data: unknown, type: string) => Promise<unknown>
     private onValidateCallbacks: (() => void)[] = []
     private key: string = ""
 
@@ -329,7 +330,7 @@ class WebRTCDataChannelValidation {
         }
     }
 
-    async handleResponse(message: any): Promise<void> {
+    async handleResponse(message: unknown): Promise<void> {
         if (message.data === "Validation Ok.") {
             console.log("Validation succeed")
             for (const callback of this.onValidateCallbacks) {
@@ -342,7 +343,7 @@ class WebRTCDataChannelValidation {
         }
     }
 
-    async handleErrResponse(message: any): Promise<void> {
+    async handleErrResponse(message: unknown): Promise<void> {
         if (message.info === "Validation Needed.") {
             await this.publish("", this.encryptKey(this.key), DATA_CHANNEL_TYPE.VALIDATION)
         }
@@ -371,27 +372,27 @@ class WebRTCDataChannelValidation {
 
 class WebRTCChannelProbeResponse {
     private channel: RTCDataChannel
-    private publish: (topic: string, data: any, type: string) => void
+    private publish: (topic: string, data: unknown, type: string) => void
 
     constructor(channel: RTCDataChannel, pub_sub: WebRTCDataChannelPubSub) {
         this.channel = channel
         this.publish = pub_sub.publishWithoutCallback.bind(pub_sub)
     }
 
-    handleResponse(_info: any) {
+    handleResponse(_info: unknown) {
         // this.publish("", info, DATA_CHANNEL_TYPE.RTC_INNER_REQ)
     }
 }
 
 class WebRTCDataChannelNetworkStatus {
-    private conn: any
+    private conn: unknown
     private channel: RTCDataChannel
-    private publish: (topic: string, data: any, type: string) => Promise<any>
+    private publish: (topic: string, data: unknown, type: string) => Promise<unknown>
     private networkTimer: number | null = null
     private networkStatus: string = ""
     private onNetworkStatusCallbacks: ((mode: string) => void)[] = []
 
-    constructor(conn: any, channel: RTCDataChannel, pub_sub: WebRTCDataChannelPubSub) {
+    constructor(conn: unknown, channel: RTCDataChannel, pub_sub: WebRTCDataChannelPubSub) {
         this.conn = conn
         this.channel = channel
         this.publish = pub_sub.publish.bind(pub_sub)
@@ -435,7 +436,7 @@ class WebRTCDataChannelNetworkStatus {
         }
     }
 
-    private handleResponse(info: any): void {
+    private handleResponse(info: unknown): void {
         console.log("Network status message received.")
         const status = info.get("status")
         if (status === "Undefined" || status === "NetworkStatus.DISCONNECTED") {
@@ -461,7 +462,7 @@ class WebRTCDataChannelNetworkStatus {
 
 class WebRTCDataChannelFileUploader {
     private channel: RTCDataChannel
-    private publish: (topic: string, data: any, type: string) => Promise<any>
+    private publish: (topic: string, data: unknown, type: string) => Promise<unknown>
     private cancelUpload: boolean = false
 
     constructor(channel: RTCDataChannel, pub_sub: WebRTCDataChannelPubSub) {
@@ -541,7 +542,7 @@ class WebRTCDataChannelFileUploader {
 
 class WebRTCDataChannelFileDownloader {
     private channel: RTCDataChannel
-    private publish: (topic: string, data: any, type: string) => Promise<any>
+    private publish: (topic: string, data: unknown, type: string) => Promise<unknown>
     private cancelDownload: boolean = false
 
     constructor(channel: RTCDataChannel, pub_sub: WebRTCDataChannelPubSub) {
@@ -602,14 +603,14 @@ class WebRTCDataChannelFileDownloader {
 }
 
 class WebRTCDataChannelRTCInnerReq {
-    private conn: any
+    private conn: unknown
     private channel: RTCDataChannel
     public network_status: WebRTCDataChannelNetworkStatus
     private probeRes: WebRTCChannelProbeResponse
     public file_uploader: WebRTCDataChannelFileUploader
     public file_downloader: WebRTCDataChannelFileDownloader
 
-    constructor(conn: any, channel: RTCDataChannel, pub_sub: WebRTCDataChannelPubSub) {
+    constructor(conn: unknown, channel: RTCDataChannel, pub_sub: WebRTCDataChannelPubSub) {
         this.conn = conn
         this.channel = channel
 
@@ -619,7 +620,7 @@ class WebRTCDataChannelRTCInnerReq {
         this.file_downloader = new WebRTCDataChannelFileDownloader(this.channel, pub_sub)
     }
 
-    handleResponse(msg: any): void {
+    handleResponse(msg: unknown): void {
         const info = msg.info
         const reqType = info?.req_type
         if (reqType === "rtt_probe_send_from_mechine") {
@@ -690,7 +691,7 @@ function getErrorSourceText(errorSource: number): string {
     return app_error_messages[key] || `${errorSource}`
 }
 
-function handle_error(message: any) {
+function handle_error(message: unknown) {
     const data = message.data
 
     for (const error of data) {
@@ -713,14 +714,14 @@ function handle_error(message: any) {
 export class WebRTCDataChannel {
     channel: RTCDataChannel
     data_channel_opened: boolean = false
-    conn: any
+    conn: unknown
     pub_sub: WebRTCDataChannelPubSub
     heartbeat: WebRTCDataChannelHeartBeat
     validation: WebRTCDataChannelValidation
     rtc_inner_req: WebRTCDataChannelRTCInnerReq
     decoder!: UnifiedLidarDecoder
 
-    constructor(conn: any, pc: RTCPeerConnection) {
+    constructor(conn: unknown, pc: RTCPeerConnection) {
         this.channel = pc.createDataChannel("data")
         this.conn = conn
 
@@ -765,7 +766,7 @@ export class WebRTCDataChannel {
         this.channel.onmessage = async (event) => {
             console.log("Received message on data channel:", event.data)
             try {
-                let parsed_data: any
+                let parsed_data: unknown
 
                 if (typeof event.data === "string") {
                     parsed_data = JSON.parse(event.data)
@@ -783,7 +784,7 @@ export class WebRTCDataChannel {
         }
     }
 
-    async handle_response(msg: any) {
+    async handle_response(msg: unknown) {
         const msg_type = msg.type
 
         if (msg_type === DATA_CHANNEL_TYPE.VALIDATION) {
@@ -824,7 +825,7 @@ export class WebRTCDataChannel {
         })
     }
 
-    deal_array_buffer(buffer: ArrayBuffer): any {
+    deal_array_buffer(buffer: ArrayBuffer): unknown {
         const view = new DataView(buffer)
         const header_1 = view.getUint16(0, true)
         const header_2 = view.getUint16(2, true)
@@ -835,7 +836,7 @@ export class WebRTCDataChannel {
         }
     }
 
-    deal_array_buffer_for_normal(buffer: ArrayBuffer): any {
+    deal_array_buffer_for_normal(buffer: ArrayBuffer): unknown {
         const view = new DataView(buffer)
         const header_length = view.getUint16(0, true)
         const json_data = buffer.slice(4, 4 + header_length)
@@ -848,7 +849,7 @@ export class WebRTCDataChannel {
         return decoded_json
     }
 
-    deal_array_buffer_for_lidar(buffer: ArrayBuffer): any {
+    deal_array_buffer_for_lidar(buffer: ArrayBuffer): unknown {
         const view = new DataView(buffer)
         const header_length = view.getUint32(0, true)
         const json_data = buffer.slice(8, 8 + header_length)

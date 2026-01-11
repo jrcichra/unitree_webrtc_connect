@@ -1,5 +1,23 @@
 import * as LZ4 from "lz4js"
 
+interface LidarDecodeData {
+    src_size?: number
+    origin: number[]
+    resolution: number
+}
+
+interface NativeLidarOutput {
+    points: Float64Array
+}
+
+interface LibVoxelLidarOutput {
+    point_count: number
+    face_count: number
+    positions: Uint8Array
+    uvs: Uint8Array
+    indices: Uint32Array
+}
+
 function decompress(compressed_data: Uint8Array, decomp_size: number): Uint8Array {
     return LZ4.decompress(compressed_data, decomp_size)
 }
@@ -42,7 +60,8 @@ function bits_to_points(buf: Uint8Array, origin: number[], resolution: number = 
 }
 
 export class NativeLidarDecoder {
-    decode(compressed_data: Uint8Array, data: any): any {
+    async decode(compressed_data: Uint8Array, data: LidarDecodeData): Promise<NativeLidarOutput> {
+        if (data.src_size == null) throw new Error("src_size is required for NativeLidarDecoder")
         const decompressed = decompress(compressed_data, data.src_size)
         const points = bits_to_points(decompressed, data.origin, data.resolution)
 
@@ -165,7 +184,7 @@ export class LibVoxelLidarDecoder {
         buffer.set(value, start)
     }
 
-    async decode(compressed_data: Uint8Array, data: any): Promise<any> {
+    async decode(compressed_data: Uint8Array, data: LidarDecodeData): Promise<LibVoxelLidarOutput> {
         if (!this.wasmInstance || !this.generate) {
             await this.init()
         }
@@ -230,7 +249,7 @@ export class UnifiedLidarDecoder {
         }
     }
 
-    async decode(binary_data: ArrayBuffer, data: any): Promise<any> {
+    async decode(binary_data: ArrayBuffer, data: LidarDecodeData): Promise<NativeLidarOutput | LibVoxelLidarOutput> {
         const compressed_data = new Uint8Array(binary_data)
         return await this.decoder.decode(compressed_data, data)
     }

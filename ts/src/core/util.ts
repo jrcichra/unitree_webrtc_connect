@@ -23,11 +23,11 @@ export function generate_uuid(): string {
     return uuid_template.replace(/[xy]/g, replace_char)
 }
 
-export function get_nested_field(message: Record<string, any>, ...fields: string[]): any {
-    let current_level = message
+export function get_nested_field(message: Record<string, unknown>, ...fields: string[]): unknown {
+    let current_level: unknown = message
     for (const field of fields) {
         if (typeof current_level === "object" && current_level !== null && field in current_level) {
-            current_level = current_level[field]
+            current_level = (current_level as Record<string, unknown>)[field]
         } else {
             return null
         }
