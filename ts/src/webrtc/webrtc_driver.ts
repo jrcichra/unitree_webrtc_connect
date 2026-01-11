@@ -39,7 +39,8 @@ export class UnitreeWebRTCConnection {
         if (this.connectionMethod === WebRTCConnectionMethod.Remote) {
             const public_key = await fetch_public_key()
             if (!public_key) throw new Error("Failed to fetch public key")
-            const turn_server_info = await fetch_turn_server_info(this.sn!, this.token, public_key)
+            if (!this.sn) throw new Error("Serial number required for remote connection")
+            const turn_server_info = await fetch_turn_server_info(this.sn, this.token, public_key)
             await this.init_webrtc(turn_server_info)
         } else if (this.connectionMethod === WebRTCConnectionMethod.LocalSTA) {
             if (!this.ip && this.sn) {
@@ -52,10 +53,10 @@ export class UnitreeWebRTCConnection {
                     )
                 }
             }
-            await this.init_webrtc(this.ip)
+            await this.init_webrtc()
         } else if (this.connectionMethod === WebRTCConnectionMethod.LocalAP) {
             this.ip = "192.168.12.1"
-            await this.init_webrtc(this.ip)
+            await this.init_webrtc()
         }
     }
 
@@ -78,16 +79,16 @@ export class UnitreeWebRTCConnection {
     }
 
     create_webrtc_configuration(
-        turn_server_info?: any,
+        turn_server_info?: Record<string, unknown> | null,
         stunEnable: boolean = true,
         turnEnable: boolean = true
     ): RTCConfiguration {
         const ice_servers: RTCIceServer[] = []
 
         if (turn_server_info) {
-            const username = turn_server_info.user
-            const credential = turn_server_info.passwd
-            const turn_url = turn_server_info.realm
+            const username = turn_server_info.user as string
+            const credential = turn_server_info.passwd as string
+            const turn_url = turn_server_info.realm as string
 
             if (username && credential && turn_url) {
                 if (turnEnable) {
@@ -112,16 +113,17 @@ export class UnitreeWebRTCConnection {
         }
     }
 
-    async init_webrtc(turn_server_info?: any, _ip?: string): Promise<void> {
+    async init_webrtc(turn_server_info?: Record<string, unknown> | null, _ip?: string): Promise<void> {
         const configuration = this.create_webrtc_configuration(turn_server_info)
         this.pc = new RTCPeerConnection(configuration)
 
-        this.datachannel = new WebRTCDataChannel(this, this.pc!)
-        this.audio = new WebRTCAudioChannel(this.pc!, this.datachannel)
-        this.video = new WebRTCVideoChannel(this.pc!, this.datachannel)
+        this.datachannel = new WebRTCDataChannel(this, this.pc)
+        this.audio = new WebRTCAudioChannel(this.pc, this.datachannel)
+        this.video = new WebRTCVideoChannel(this.pc, this.datachannel)
 
         this.pc.onicegatheringstatechange = () => {
-            const state = this.pc!.iceGatheringState
+            if (!this.pc) return
+            const state = this.pc.iceGatheringState
             if (state === "new") {
                 print_status("ICE Gathering State", "🔵 new")
             } else if (state === "gathering") {
@@ -132,7 +134,8 @@ export class UnitreeWebRTCConnection {
         }
 
         this.pc.oniceconnectionstatechange = () => {
-            const state = this.pc!.iceConnectionState
+            if (!this.pc) return
+            const state = this.pc.iceConnectionState
             if (state === "checking") {
                 print_status("ICE Connection State", "🔵 checking")
             } else if (state === "completed") {
@@ -145,7 +148,8 @@ export class UnitreeWebRTCConnection {
         }
 
         this.pc.onconnectionstatechange = () => {
-            const state = this.pc!.connectionState
+            if (!this.pc) return
+            const state = this.pc.connectionState
             if (state === "connecting") {
                 print_status("Peer Connection State", "🔵 connecting")
             } else if (state === "connected") {
@@ -155,12 +159,13 @@ export class UnitreeWebRTCConnection {
                 this.isConnected = false
                 print_status("Peer Connection State", "⚫ closed")
             } else if (state === "failed") {
-                print_status("Peer Connection State", "� failed")
+                print_status("Peer Connection State", "🔴 failed")
             }
         }
 
         this.pc.onsignalingstatechange = () => {
-            const state = this.pc!.signalingState
+            if (!this.pc) return
+            const state = this.pc.signalingState
             if (state === "stable") {
                 print_status("Signaling State", "🟢 stable")
             } else if (state === "have-local-offer") {
@@ -186,17 +191,19 @@ export class UnitreeWebRTCConnection {
         }
 
         console.log("Creating offer...")
-        const offer = await this.pc!.createOffer()
-        await this.pc!.setLocalDescription(offer)
+        if (!this.pc) throw new Error("Peer connection not initialized")
+        const offer = await this.pc.createOffer()
+        await this.pc.setLocalDescription(offer)
 
         let peer_answer_json: string | null = null
         if (this.connectionMethod === WebRTCConnectionMethod.Remote) {
-            peer_answer_json = await this.get_answer_from_remote_peer(this.pc!, turn_server_info)
+            peer_answer_json = await this.get_answer_from_remote_peer(this.pc, turn_server_info)
         } else if (
             this.connectionMethod === WebRTCConnectionMethod.LocalSTA ||
             this.connectionMethod === WebRTCConnectionMethod.LocalAP
         ) {
-            peer_answer_json = await this.get_answer_from_local_peer(this.pc!, this.ip!)
+            if (!this.ip) throw new Error("IP address required for local connection")
+            peer_answer_json = await this.get_answer_from_local_peer(this.pc, this.ip)
         }
 
         if (peer_answer_json) {
@@ -207,7 +214,7 @@ export class UnitreeWebRTCConnection {
             }
 
             const remote_sdp = new RTCSessionDescription({ sdp: peer_answer.sdp, type: peer_answer.type })
-            await this.pc!.setRemoteDescription(remote_sdp)
+            await this.pc.setRemoteDescription(remote_sdp)
         } else {
             throw new Error("Could not get SDP from the peer. Check if the Go2 is switched on")
         }
@@ -215,8 +222,12 @@ export class UnitreeWebRTCConnection {
         await this.datachannel.wait_datachannel_open()
     }
 
-    async get_answer_from_remote_peer(pc: RTCPeerConnection, turn_server_info?: any): Promise<string | null> {
-        const sdp_offer = pc.localDescription!
+    async get_answer_from_remote_peer(
+        pc: RTCPeerConnection,
+        turn_server_info?: Record<string, unknown> | null
+    ): Promise<string | null> {
+        const sdp_offer = pc.localDescription
+        if (!sdp_offer) return null
         const public_key = await fetch_public_key()
         if (!public_key) return null
 
@@ -230,11 +241,13 @@ export class UnitreeWebRTCConnection {
 
         console.log("Local SDP created:", sdp_offer_json)
 
-        return await send_sdp_to_remote_peer(this.sn!, JSON.stringify(sdp_offer_json), this.token, public_key)
+        if (!this.sn) return null
+        return await send_sdp_to_remote_peer(this.sn, JSON.stringify(sdp_offer_json), this.token, public_key)
     }
 
     async get_answer_from_local_peer(pc: RTCPeerConnection, ip: string): Promise<string | null> {
-        const sdp_offer = pc.localDescription!
+        const sdp_offer = pc.localDescription
+        if (!sdp_offer) return null
 
         const sdp_offer_json = {
             id: this.connectionMethod === WebRTCConnectionMethod.LocalSTA ? "STA_localNetwork" : "",

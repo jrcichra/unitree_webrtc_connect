@@ -11,7 +11,7 @@ export class WebRTCAudioHub {
         this.data_channel = connection.datachannel
     }
 
-    async get_audio_list(): Promise<any> {
+    async get_audio_list(): Promise<Record<string, unknown>> {
         const response = await this.data_channel.pub_sub.publish(
             "rt/api/audiohub/request",
             {
@@ -98,7 +98,7 @@ export class WebRTCAudioHub {
         )
     }
 
-    async get_play_mode(): Promise<any> {
+    async get_play_mode(): Promise<Record<string, unknown>> {
         const response = await this.data_channel.pub_sub.publish(
             "rt/api/audiohub/request",
             {
@@ -110,7 +110,7 @@ export class WebRTCAudioHub {
         return response
     }
 
-    async upload_audio_file(audioFile: File): Promise<any> {
+    async upload_audio_file(audioFile: File): Promise<Record<string, unknown>> {
         // Read file as ArrayBuffer
         const audioData = await audioFile.arrayBuffer()
         const audioBytes = new Uint8Array(audioData)
@@ -135,7 +135,7 @@ export class WebRTCAudioHub {
 
             console.log(`Splitting file into ${totalChunks} chunks`)
 
-            let lastResponse: any = null
+            let lastResponse: Record<string, unknown> = {}
 
             // Send each chunk
             for (let i = 0; i < chunks.length; i++) {
@@ -197,7 +197,7 @@ export class WebRTCAudioHub {
         )
     }
 
-    async upload_megaphone(audioFile: File): Promise<any> {
+    async upload_megaphone(audioFile: File): Promise<Record<string, unknown>> {
         // Similar to upload_audio_file but for megaphone
         const audioData = await audioFile.arrayBuffer()
         const audioBytes = new Uint8Array(audioData)
@@ -214,7 +214,7 @@ export class WebRTCAudioHub {
 
         console.log(`Splitting megaphone file into ${totalChunks} chunks`)
 
-        let lastResponse: any = null
+        let lastResponse: Record<string, unknown> = {}
 
         for (let i = 0; i < chunks.length; i++) {
             const chunk = chunks[i]

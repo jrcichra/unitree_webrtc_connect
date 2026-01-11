@@ -23,7 +23,7 @@ class FutureResolver {
         }
     }
 
-    runResolveForTopic(message: any) {
+    runResolveForTopic(message: Record<string, any>) {
         if (!message.type) return
 
         if (
@@ -306,7 +306,7 @@ class WebRTCDataChannelHeartBeat {
         }
     }
 
-    handleResponse(message: any): void {
+    handleResponse(_message: any): void {
         this.heartbeatResponse = Date.now() / 1000
         console.log("Heartbeat response received.")
     }
@@ -349,7 +349,9 @@ class WebRTCDataChannelValidation {
     }
 
     private hexToBase64(hexStr: string): string {
-        const bytes = new Uint8Array(hexStr.match(/.{1,2}/g)!.map((byte) => parseInt(byte, 16)))
+        const matches = hexStr.match(/.{1,2}/g)
+        if (!matches) throw new Error("Invalid hex string")
+        const bytes = new Uint8Array(matches.map((byte) => parseInt(byte, 16)))
         let binary = ""
         bytes.forEach((byte) => (binary += String.fromCharCode(byte)))
         return btoa(binary)

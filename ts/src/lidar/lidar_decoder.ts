@@ -118,14 +118,15 @@ export class LibVoxelLidarDecoder {
         this.free = this.wasmInstance.exports.g as (ptr: number) => void
 
         // Allocate buffers
-        this.input = this.malloc!(61440)
-        this.decompressBuffer = this.malloc!(80000)
-        this.positions = this.malloc!(2880000)
-        this.uvs = this.malloc!(1920000)
-        this.indices = this.malloc!(5760000)
-        this.decompressedSize = this.malloc!(4)
-        this.faceCount = this.malloc!(4)
-        this.pointCount = this.malloc!(4)
+        if (!this.malloc) throw new Error("malloc function not available")
+        this.input = this.malloc(61440)
+        this.decompressBuffer = this.malloc(80000)
+        this.positions = this.malloc(2880000)
+        this.uvs = this.malloc(1920000)
+        this.indices = this.malloc(5760000)
+        this.decompressedSize = this.malloc(4)
+        this.faceCount = this.malloc(4)
+        this.pointCount = this.malloc(4)
     }
 
     private adjust_memory_size(_t: number): number {
@@ -140,7 +141,6 @@ export class LibVoxelLidarDecoder {
 
     private get_value(ptr: number, type: string = "i8"): number {
         if (!this.memory) return 0
-        const buffer = new Uint8Array(this.memory.buffer)
         const view = new DataView(this.memory.buffer)
 
         switch (type) {
@@ -174,7 +174,8 @@ export class LibVoxelLidarDecoder {
 
         const some_v = Math.floor(data.origin[2] / data.resolution)
 
-        this.generate!(
+        if (!this.generate) throw new Error("generate function not available")
+        this.generate(
             this.input,
             compressed_data.length,
             80000, // decompressBufferSize

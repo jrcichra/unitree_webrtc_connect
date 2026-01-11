@@ -55,10 +55,10 @@ function _calc_local_path_ending(data1: string): string {
 
 export async function make_remote_request(
     path: string,
-    body: any,
+    body: Record<string, unknown>,
     token: string,
     method: string = "GET"
-): Promise<any> {
+): Promise<Record<string, unknown>> {
     const APP_SIGN_SECRET = "XyvkwK45hp5PHfA8"
     const UM_CHANNEL_KEY = "UMENG_CHANNEL"
     const BASE_URL = "https://global-robot-api.unitree.com/"
@@ -100,10 +100,10 @@ export async function make_remote_request(
 
     let response: Response
     if (method.toUpperCase() === "GET") {
-        const params = new URLSearchParams(body)
+        const params = new URLSearchParams(body as Record<string, string>)
         response = await fetch(`${url}?${params}`, { headers })
     } else {
-        const encoded_body = new URLSearchParams(body)
+        const encoded_body = new URLSearchParams(body as Record<string, string>)
         response = await fetch(url, {
             method: "POST",
             headers,

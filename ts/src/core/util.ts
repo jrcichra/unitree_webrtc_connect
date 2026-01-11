@@ -23,7 +23,7 @@ export function generate_uuid(): string {
     return uuid_template.replace(/[xy]/g, replace_char)
 }
 
-export function get_nested_field(message: any, ...fields: string[]): any {
+export function get_nested_field(message: Record<string, any>, ...fields: string[]): any {
     let current_level = message
     for (const field of fields) {
         if (typeof current_level === "object" && current_level !== null && field in current_level) {
@@ -77,7 +77,7 @@ export async function fetch_turn_server_info(
     serial: string,
     access_token: string,
     public_key: forge.pki.rsa.PublicKey
-): Promise<any> {
+): Promise<Record<string, unknown> | null> {
     console.log("Obtaining TURN server info...")
     const aes_key = generate_aes_key()
     const path = "webrtc/account"
