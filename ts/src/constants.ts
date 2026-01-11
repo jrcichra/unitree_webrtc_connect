@@ -103,7 +103,8 @@ export const RTC_TOPIC: Record<string, string> = {
     LIDAR_LOCALIZATION_CLOUD_POINT: "rt/uslam/localization/cloud_world",
     PROGRAMMING_ACTUATOR_CMD: "rt/programming_actuator/command",
     ASSISTANT_RECORDER: "rt/api/assistant_recorder/request",
-    MOTION_SWITCHER: "rt/api/motion_switcher/request"
+    MOTION_SWITCHER: "rt/api/motion_switcher/request",
+    MCF_CMD: "rt/api/mcf/request"
 };
 
 export const SPORT_CMD: Record<string, number> = {
