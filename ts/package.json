@@ -1,40 +1,50 @@
 {
-  "name": "unitree-webrtc-connect-ts",
-  "version": "1.0.0",
-  "description": "TypeScript library for connecting to Unitree Go2 and G1 robots via WebRTC, designed for websites and WebXR applications",
-  "main": "dist/index.js",
-  "module": "dist/index.js",
-  "types": "dist/index.d.ts",
-  "scripts": {
-    "build": "tsc",
-    "test": "echo '✅ Library built successfully. Check dist/ directory for compiled output.'",
-    "validate": "tsc --noEmit",
-    "dev": "tsc --watch"
-  },
-  "keywords": [
-    "unitree",
-    "webrtc",
-    "robot",
-    "go2",
-    "g1",
-    "webxr",
-    "vr"
-  ],
-  "author": "",
-  "license": "MIT",
-  "type": "module",
-  "devDependencies": {
-    "@types/lz4js": "^0.2.2",
-    "@types/node": "^25.0.6",
-    "typescript": "^5.9.3"
-  },
-  "dependencies": {
-    "@types/crypto-js": "^4.2.2",
-    "@types/node-forge": "^1.3.14",
-    "@types/three": "^0.182.0",
-    "crypto-js": "^4.2.0",
-    "lz4js": "^0.2.0",
-    "node-forge": "^1.3.3",
-    "three": "^0.182.0"
-  }
+    "name": "unitree-webrtc-connect-ts",
+    "version": "1.0.0",
+    "description": "TypeScript library for connecting to Unitree Go2 and G1 robots via WebRTC, designed for websites and WebXR applications",
+    "main": "dist/index.js",
+    "module": "dist/index.js",
+    "types": "dist/index.d.ts",
+    "scripts": {
+        "build": "tsc",
+        "test": "echo '✅ Library built successfully. Check dist/ directory for compiled output.'",
+        "validate": "tsc --noEmit",
+        "dev": "tsc --watch",
+        "lint": "eslint src/**/*.ts",
+        "lint:fix": "eslint src/**/*.ts --fix",
+        "format": "prettier --write src/**/*.ts",
+        "format:check": "prettier --check src/**/*.ts"
+    },
+    "keywords": [
+        "unitree",
+        "webrtc",
+        "robot",
+        "go2",
+        "g1",
+        "webxr",
+        "vr"
+    ],
+    "author": "",
+    "license": "MIT",
+    "type": "module",
+    "devDependencies": {
+        "@types/lz4js": "^0.2.2",
+        "@types/node": "^25.0.6",
+        "@typescript-eslint/eslint-plugin": "^8.52.0",
+        "@typescript-eslint/parser": "^8.52.0",
+        "eslint": "^9.39.2",
+        "eslint-config-prettier": "^10.1.8",
+        "eslint-plugin-prettier": "^5.5.4",
+        "prettier": "^3.7.4",
+        "typescript": "^5.9.3"
+    },
+    "dependencies": {
+        "@types/crypto-js": "^4.2.2",
+        "@types/node-forge": "^1.3.14",
+        "@types/three": "^0.182.0",
+        "crypto-js": "^4.2.0",
+        "lz4js": "^0.2.0",
+        "node-forge": "^1.3.3",
+        "three": "^0.182.0"
+    }
 }
