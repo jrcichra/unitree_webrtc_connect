@@ -13,6 +13,10 @@ build/
 *.js
 *.js.map
 
+# But keep config files
+!eslint.config.js
+!*.config.js
+
 # Environment variables
 .env
 .env.local
