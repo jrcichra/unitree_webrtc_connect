@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Unitree Go2 WebRTC Connection - Browser Example</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .connection-form {
+            margin-bottom: 20px;
+        }
+        .form-group {
+            margin-bottom: 10px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        input, select {
+            width: 100%;
+            padding: 8px;
+            box-sizing: border-box;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        .status {
+            margin-top: 20px;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .status.connected {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .status.disconnected {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        .video-container {
+            margin-top: 20px;
+        }
+        video {
+            width: 100%;
+            max-width: 640px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Unitree Go2 WebRTC Connection</h1>
+
+    <div class="connection-form">
+        <div class="form-group">
+            <label for="connectionMethod">Connection Method:</label>
+            <select id="connectionMethod">
+                <option value="LocalSTA">Local STA (IP required)</option>
+                <option value="LocalAP">Local AP</option>
+                <option value="Remote">Remote (requires credentials)</option>
+            </select>
+        </div>
+
+        <div class="form-group" id="ipGroup">
+            <label for="ip">IP Address:</label>
+            <input type="text" id="ip" placeholder="192.168.1.100">
+        </div>
+
+        <div class="form-group" id="serialGroup" style="display: none;">
+            <label for="serial">Serial Number:</label>
+            <input type="text" id="serial" placeholder="B42D2000XXXXXXXX">
+        </div>
+
+        <div class="form-group" id="usernameGroup" style="display: none;">
+            <label for="username">Username (Email):</label>
+            <input type="email" id="username" placeholder="your@email.com">
+        </div>
+
+        <div class="form-group" id="passwordGroup" style="display: none;">
+            <label for="password">Password:</label>
+            <input type="password" id="password">
+        </div>
+
+        <button id="connectBtn">Connect</button>
+        <button id="disconnectBtn" disabled>Disconnect</button>
+    </div>
+
+    <div id="status" class="status disconnected">Disconnected</div>
+
+    <div class="video-container">
+        <h2>Video Stream</h2>
+        <video id="videoElement" controls autoplay muted></video>
+        <div>
+            <button id="enableVideoBtn" disabled>Enable Video</button>
+            <button id="disableVideoBtn" disabled>Disable Video</button>
+        </div>
+    </div>
+
+    <div class="audio-container">
+        <h2>Audio Control</h2>
+        <button id="enableAudioBtn" disabled>Enable Audio</button>
+        <button id="disableAudioBtn" disabled>Disable Audio</button>
+    </div>
+
+    <script type="module">
+        import { UnitreeWebRTCConnection, WebRTCConnectionMethod } from '../dist/index.js';
+
+        let connection = null;
+
+        const connectionMethodSelect = document.getElementById('connectionMethod');
+        const ipInput = document.getElementById('ip');
+        const serialInput = document.getElementById('serial');
+        const usernameInput = document.getElementById('username');
+        const passwordInput = document.getElementById('password');
+        const connectBtn = document.getElementById('connectBtn');
+        const disconnectBtn = document.getElementById('disconnectBtn');
+        const statusDiv = document.getElementById('status');
+        const videoElement = document.getElementById('videoElement');
+        const enableVideoBtn = document.getElementById('enableVideoBtn');
+        const disableVideoBtn = document.getElementById('disableVideoBtn');
+        const enableAudioBtn = document.getElementById('enableAudioBtn');
+        const disableAudioBtn = document.getElementById('disableAudioBtn');
+
+        // Show/hide form fields based on connection method
+        connectionMethodSelect.addEventListener('change', () => {
+            const method = connectionMethodSelect.value;
+            document.getElementById('ipGroup').style.display = method === 'LocalSTA' ? 'block' : 'none';
+            document.getElementById('serialGroup').style.display = method === 'Remote' ? 'block' : 'none';
+            document.getElementById('usernameGroup').style.display = method === 'Remote' ? 'block' : 'none';
+            document.getElementById('passwordGroup').style.display = method === 'Remote' ? 'block' : 'none';
+        });
+
+        connectBtn.addEventListener('click', async () => {
+            const method = connectionMethodSelect.value;
+            let connectionMethod;
+
+            switch (method) {
+                case 'LocalSTA':
+                    connectionMethod = WebRTCConnectionMethod.LocalSTA;
+                    break;
+                case 'LocalAP':
+                    connectionMethod = WebRTCConnectionMethod.LocalAP;
+                    break;
+                case 'Remote':
+                    connectionMethod = WebRTCConnectionMethod.Remote;
+                    break;
+                default:
+                    alert('Invalid connection method');
+                    return;
+            }
+
+            try {
+                connectBtn.disabled = true;
+                connectBtn.textContent = 'Connecting...';
+
+                connection = new UnitreeWebRTCConnection(
+                    connectionMethod,
+                    method === 'Remote' ? serialInput.value : undefined,
+                    method === 'LocalSTA' ? ipInput.value : undefined,
+                    method === 'Remote' ? usernameInput.value : undefined,
+                    method === 'Remote' ? passwordInput.value : undefined
+                );
+
+                await connection.connect();
+
+                statusDiv.textContent = 'Connected';
+                statusDiv.className = 'status connected';
+                disconnectBtn.disabled = false;
+                enableVideoBtn.disabled = false;
+                enableAudioBtn.disabled = false;
+
+                // Set up video stream
+                if (connection.pc && connection.pc.ontrack) {
+                    connection.pc.ontrack = (event) => {
+                        if (event.track.kind === 'video') {
+                            const stream = new MediaStream([event.track]);
+                            videoElement.srcObject = stream;
+                        }
+                    };
+                }
+
+            } catch (error) {
+                console.error('Connection failed:', error);
+                alert('Connection failed: ' + error.message);
+                statusDiv.textContent = 'Connection failed: ' + error.message;
+                statusDiv.className = 'status disconnected';
+            } finally {
+                connectBtn.disabled = false;
+                connectBtn.textContent = 'Connect';
+            }
+        });
+
+        disconnectBtn.addEventListener('click', async () => {
+            if (connection) {
+                await connection.disconnect();
+                connection = null;
+                statusDiv.textContent = 'Disconnected';
+                statusDiv.className = 'status disconnected';
+                disconnectBtn.disabled = true;
+                enableVideoBtn.disabled = true;
+                disableVideoBtn.disabled = true;
+                enableAudioBtn.disabled = true;
+                disableAudioBtn.disabled = true;
+                videoElement.srcObject = null;
+            }
+        });
+
+        enableVideoBtn.addEventListener('click', () => {
+            if (connection && connection.datachannel) {
+                connection.datachannel.switchVideoChannel(true);
+                enableVideoBtn.disabled = true;
+                disableVideoBtn.disabled = false;
+            }
+        });
+
+        disableVideoBtn.addEventListener('click', () => {
+            if (connection && connection.datachannel) {
+                connection.datachannel.switchVideoChannel(false);
+                disableVideoBtn.disabled = true;
+                enableVideoBtn.disabled = false;
+            }
+        });
+
+        enableAudioBtn.addEventListener('click', () => {
+            if (connection && connection.datachannel) {
+                connection.datachannel.switchAudioChannel(true);
+                enableAudioBtn.disabled = true;
+                disableAudioBtn.disabled = false;
+            }
+        });
+
+        disableAudioBtn.addEventListener('click', () => {
+            if (connection && connection.datachannel) {
+                connection.datachannel.switchAudioChannel(false);
+                disableAudioBtn.disabled = true;
+                enableAudioBtn.disabled = false;
+            }
+        });
+    </script>
+</body>
+</html>
