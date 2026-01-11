@@ -155,7 +155,7 @@ export async function send_sdp_to_remote_peer(
     const response = await make_remote_request(path, body, access_token, "POST")
     if (response.code === 100) {
         console.log("Received SDP Answer from Go2!")
-        return aes_decrypt(response.data, aes_key)
+        return aes_decrypt(response.data as string, aes_key)
     } else if (response.code === 1000) {
         console.log("Device not online")
         throw new Error("Device not online")

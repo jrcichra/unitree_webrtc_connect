@@ -20,7 +20,7 @@ export class WebRTCAudioHub {
             },
             "request" // Using generic type since pub_sub is stubbed
         )
-        return response
+        return response as Record<string, unknown>
     }
 
     async play_by_uuid(uuid: string): Promise<void> {
@@ -107,7 +107,7 @@ export class WebRTCAudioHub {
             },
             "request"
         )
-        return response
+        return response as Record<string, unknown>
     }
 
     async upload_audio_file(audioFile: File): Promise<Record<string, unknown>> {
@@ -154,14 +154,14 @@ export class WebRTCAudioHub {
 
                 console.log(`Sending chunk ${i + 1}/${totalChunks}`)
 
-                lastResponse = await this.data_channel.pub_sub.publish(
+                lastResponse = (await this.data_channel.pub_sub.publish(
                     "rt/api/audiohub/request",
                     {
                         api_id: AUDIO_API.UPLOAD_AUDIO_FILE,
                         parameter: JSON.stringify(parameter),
                     },
                     "request"
-                )
+                )) as Record<string, unknown>
 
                 // Small delay between chunks
                 await new Promise((resolve) => setTimeout(resolve, 100))
@@ -227,14 +227,14 @@ export class WebRTCAudioHub {
 
             console.log(`Sending megaphone chunk ${i + 1}/${totalChunks}`)
 
-            lastResponse = await this.data_channel.pub_sub.publish(
+            lastResponse = (await this.data_channel.pub_sub.publish(
                 "rt/api/audiohub/request",
                 {
                     api_id: AUDIO_API.UPLOAD_MEGAPHONE,
                     parameter: JSON.stringify(parameter),
                 },
                 "request"
-            )
+            )) as Record<string, unknown>
 
             await new Promise((resolve) => setTimeout(resolve, 100))
         }

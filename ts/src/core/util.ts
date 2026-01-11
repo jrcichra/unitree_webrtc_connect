@@ -44,8 +44,8 @@ export async function fetch_token(email: string, password: string): Promise<stri
     }
     const response = await make_remote_request(path, body, "", "POST")
     if (response.code === 100) {
-        const data = response.data
-        const access_token = data.accessToken
+        const data = response.data as Record<string, unknown>
+        const access_token = data.accessToken as string
         return access_token
     } else {
         console.error("Failed to receive token")
@@ -60,7 +60,7 @@ export async function fetch_public_key(): Promise<forge.pki.rsa.PublicKey | null
     try {
         const response = await make_remote_request(path, {}, "", "GET")
         if (response.code === 100) {
-            const public_key_pem = response.data
+            const public_key_pem = response.data as string
             return rsa_load_public_key(public_key_pem)
         } else {
             console.error("Failed to receive public key")
@@ -87,7 +87,7 @@ export async function fetch_turn_server_info(
     }
     const response = await make_remote_request(path, body, access_token, "POST")
     if (response.code === 100) {
-        return JSON.parse(aes_decrypt(response.data, aes_key))
+        return JSON.parse(aes_decrypt(response.data as string, aes_key))
     } else {
         console.error("Failed to receive TURN server info")
         return null

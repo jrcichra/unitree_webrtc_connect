@@ -2,6 +2,82 @@ import { DATA_CHANNEL_TYPE } from "../constants"
 import { print_status, get_nested_field, generate_md5, generate_uuid } from "../core/util"
 import { UnifiedLidarDecoder } from "../lidar/lidar_decoder"
 
+// Type definitions for WebRTC messages
+interface BaseMessage extends Record<string, unknown> {
+    type: string
+    topic?: string
+    data?: unknown
+    info?: unknown
+}
+
+interface ValidationMessage extends BaseMessage {
+    type: typeof DATA_CHANNEL_TYPE.VALIDATION
+    data: string
+    info?: string
+}
+
+interface RTCInnerReqMessage extends BaseMessage {
+    type: typeof DATA_CHANNEL_TYPE.RTC_INNER_REQ
+    info: Record<string, unknown>
+}
+
+interface HeartbeatMessage extends BaseMessage {
+    type: typeof DATA_CHANNEL_TYPE.HEARTBEAT
+}
+
+interface ErrorMessage extends BaseMessage {
+    type: typeof DATA_CHANNEL_TYPE.ERRORS | typeof DATA_CHANNEL_TYPE.ADD_ERROR | typeof DATA_CHANNEL_TYPE.RM_ERROR
+    data: [number, number, number][]
+}
+
+interface ContentInfo {
+    enable_chunking: boolean
+    chunk_index: number
+    total_chunk_num: number
+}
+
+interface DataMessage extends BaseMessage {
+    data: {
+        uuid?: string
+        header?: {
+            identity: {
+                id: string
+                api_id: string
+            }
+            policy?: {
+                priority: number
+            }
+        }
+        req_uuid?: string
+        content_info?: ContentInfo
+        data?: Uint8Array
+        [key: string]: unknown
+    }
+}
+
+interface FileInfo {
+    enable_chunking: boolean
+    chunk_index: number
+    total_chunk_num: number
+    data: string | Uint8Array
+}
+
+interface FileMessage extends BaseMessage {
+    info: {
+        file: FileInfo
+        [key: string]: unknown
+    }
+}
+
+type WebRTCMessage = BaseMessage | ValidationMessage | RTCInnerReqMessage | HeartbeatMessage | ErrorMessage | DataMessage | FileMessage
+
+interface PublishOptions {
+    id?: string | number
+    api_id?: string
+    parameter?: string | Record<string, unknown>
+    priority?: boolean
+}
+
 // Future resolver for handling async responses
 class FutureResolver {
     private pendingResponses: { [key: string]: Promise<unknown>[] } = {}
@@ -24,27 +100,31 @@ class FutureResolver {
         }
     }
 
-    runResolveForTopic(message: Record<string, unknown>) {
+    runResolveForTopic(message: WebRTCMessage) {
         if (!message.type) return
 
         if (
             message.type === DATA_CHANNEL_TYPE.RTC_INNER_REQ &&
             get_nested_field(message, "info", "req_type") === "request_static_file"
         ) {
-            this.runResolveForTopicForFile(message)
+            this.runResolveForTopicForFile(message as FileMessage)
             return
         }
 
+        const identifier = String(
+            get_nested_field(message as Record<string, unknown>, "data", "uuid") ||
+            get_nested_field(message as Record<string, unknown>, "data", "header", "identity", "id") ||
+            get_nested_field(message as Record<string, unknown>, "info", "uuid") ||
+            get_nested_field(message as Record<string, unknown>, "info", "req_uuid") ||
+            ""
+        )
         const key = this.generateMessageKey(
-            message.type,
-            message.topic || "",
-            get_nested_field(message, "data", "uuid") ||
-                get_nested_field(message, "data", "header", "identity", "id") ||
-                get_nested_field(message, "info", "uuid") ||
-                get_nested_field(message, "info", "req_uuid")
+            message.type as string,
+            (message as BaseMessage).topic || "",
+            identifier
         )
 
-        const contentInfo = get_nested_field(message, "data", "content_info")
+        const contentInfo = get_nested_field(message, "data", "content_info") as ContentInfo | undefined
         if (contentInfo && contentInfo.enable_chunking) {
             const chunkIndex = contentInfo.chunk_index
             const totalChunks = contentInfo.total_chunk_num
@@ -56,7 +136,7 @@ class FutureResolver {
                 throw new Error("Chunk index is missing")
             }
 
-            const dataChunk = message.data.data
+            const dataChunk = (message as DataMessage).data?.data as Uint8Array
             if (chunkIndex < totalChunks) {
                 if (this.chunkDataStorage[key]) {
                     this.chunkDataStorage[key].push(dataChunk)
@@ -66,7 +146,7 @@ class FutureResolver {
                 return
             } else {
                 this.chunkDataStorage[key].push(dataChunk)
-                message.data.data = this.mergeArrayBuffers(this.chunkDataStorage[key])
+                ;(message as DataMessage).data!.data = this.mergeArrayBuffers(this.chunkDataStorage[key])
                 delete this.chunkDataStorage[key]
             }
         }
@@ -74,24 +154,28 @@ class FutureResolver {
         if (this.pendingCallbacks[key]) {
             for (const future of this.pendingCallbacks[key]) {
                 if (future) {
-                    ;(future as unknown).resolve(message)
+                    future.resolve(message)
                 }
             }
             delete this.pendingCallbacks[key]
         }
     }
 
-    private runResolveForTopicForFile(message: unknown) {
+    private runResolveForTopicForFile(message: FileMessage) {
+        const identifier = String(
+            get_nested_field(message as Record<string, unknown>, "data", "uuid") ||
+            get_nested_field(message as Record<string, unknown>, "data", "header", "identity", "id") ||
+            get_nested_field(message as Record<string, unknown>, "info", "uuid") ||
+            get_nested_field(message as Record<string, unknown>, "info", "req_uuid") ||
+            ""
+        )
         const key = this.generateMessageKey(
-            message.type,
+            message.type as string,
             message.topic || "",
-            get_nested_field(message, "data", "uuid") ||
-                get_nested_field(message, "data", "header", "identity", "id") ||
-                get_nested_field(message, "info", "uuid") ||
-                get_nested_field(message, "info", "req_uuid")
+            identifier
         )
 
-        const fileInfo = get_nested_field(message, "info", "file")
+        const fileInfo = get_nested_field(message, "info", "file") as FileInfo | undefined
         if (fileInfo && fileInfo.enable_chunking) {
             const chunkIndex = fileInfo.chunk_index
             const totalChunks = fileInfo.total_chunk_num
@@ -106,16 +190,16 @@ class FutureResolver {
             const dataChunk = fileInfo.data
             if (this.chunkDataStorage[key]) {
                 this.chunkDataStorage[key].push(
-                    typeof dataChunk === "string" ? new TextEncoder().encode(dataChunk) : dataChunk
+                    typeof dataChunk === "string" ? new TextEncoder().encode(dataChunk) : dataChunk as Uint8Array
                 )
             } else {
                 this.chunkDataStorage[key] = [
-                    typeof dataChunk === "string" ? new TextEncoder().encode(dataChunk) : dataChunk,
+                    typeof dataChunk === "string" ? new TextEncoder().encode(dataChunk) : dataChunk as Uint8Array,
                 ]
             }
 
             if (chunkIndex === totalChunks) {
-                message.info.file.data = new Uint8Array(this.mergeArrayBuffers(this.chunkDataStorage[key]))
+                message.info!.file!.data = new Uint8Array(this.mergeArrayBuffers(this.chunkDataStorage[key]))
                 delete this.chunkDataStorage[key]
             }
         }
@@ -123,7 +207,7 @@ class FutureResolver {
         if (this.pendingCallbacks[key]) {
             for (const future of this.pendingCallbacks[key]) {
                 if (future) {
-                    ;(future as unknown).resolve(message)
+                    future.resolve(message)
                 }
             }
             delete this.pendingCallbacks[key]
@@ -158,9 +242,9 @@ class WebRTCDataChannelPubSub {
     }
 
     runResolve(message: unknown) {
-        this.futureResolver.runResolveForTopic(message)
+        this.futureResolver.runResolveForTopic(message as WebRTCMessage)
 
-        const topic = message.topic
+        const topic = (message as Record<string, unknown>).topic as string
         if (topic && this.subscriptions[topic]) {
             this.subscriptions[topic](message)
         }
@@ -169,13 +253,13 @@ class WebRTCDataChannelPubSub {
     async publish(topic: string, data: unknown = null, msgType: string = DATA_CHANNEL_TYPE.MSG): Promise<unknown> {
         return new Promise((resolve, reject) => {
             if (this.channel.readyState === "open") {
-                const messageDict: unknown = {
+                const messageDict: Record<string, unknown> = {
                     type: msgType,
                     topic: topic,
                 }
 
                 if (data !== null) {
-                    messageDict.data = data
+                    ;(messageDict as Record<string, unknown>).data = data
                 }
 
                 const message = JSON.stringify(messageDict)
@@ -183,11 +267,11 @@ class WebRTCDataChannelPubSub {
                 console.log("> message sent:", message)
 
                 const uuid =
-                    get_nested_field(data, "uuid") ||
-                    get_nested_field(data, "header", "identity", "id") ||
-                    get_nested_field(data, "req_uuid")
+                    get_nested_field(data as Record<string, unknown>, "uuid") ||
+                    get_nested_field(data as Record<string, unknown>, "header", "identity", "id") ||
+                    get_nested_field(data as Record<string, unknown>, "req_uuid")
 
-                this.futureResolver.saveResolve(msgType, topic, { resolve, reject }, uuid)
+                this.futureResolver.saveResolve(msgType, topic, { resolve, reject }, uuid as string)
             } else {
                 reject(new Error("Data channel is not open"))
             }
@@ -196,13 +280,13 @@ class WebRTCDataChannelPubSub {
 
     publishWithoutCallback(topic: string, data: unknown = null, msgType: string = DATA_CHANNEL_TYPE.MSG) {
         if (this.channel.readyState === "open") {
-            const messageDict: unknown = {
+            const messageDict: Record<string, unknown> = {
                 type: msgType,
                 topic: topic,
             }
 
             if (data !== null) {
-                messageDict.data = data
+                ;(messageDict as Record<string, unknown>).data = data
             }
 
             const message = JSON.stringify(messageDict)
@@ -213,14 +297,14 @@ class WebRTCDataChannelPubSub {
         }
     }
 
-    async publishRequestNew(topic: string, options: unknown = {}): Promise<unknown> {
+    async publishRequestNew(topic: string, options: PublishOptions = {}): Promise<unknown> {
         const generatedId = (Date.now() % 2147483648) + Math.floor(Math.random() * 1000)
 
         if (!options || !options.api_id) {
             throw new Error("Please provide app id")
         }
 
-        const requestPayload: unknown = {
+        const requestPayload: Record<string, unknown> = {
             header: {
                 identity: {
                     id: options.id || generatedId,
@@ -236,7 +320,7 @@ class WebRTCDataChannelPubSub {
         }
 
         if (options && options.priority) {
-            requestPayload.header.policy = {
+            ;(requestPayload.header as Record<string, unknown>).policy = {
                 priority: 1,
             }
         }
@@ -331,20 +415,22 @@ class WebRTCDataChannelValidation {
     }
 
     async handleResponse(message: unknown): Promise<void> {
-        if (message.data === "Validation Ok.") {
+        const msg = message as Record<string, unknown>
+        if (msg.data === "Validation Ok.") {
             console.log("Validation succeed")
             for (const callback of this.onValidateCallbacks) {
                 callback()
             }
         } else {
             this.channel.dispatchEvent(new Event("open"))
-            this.key = message.data
+            this.key = msg.data as string
             await this.publish("", this.encryptKey(this.key), DATA_CHANNEL_TYPE.VALIDATION)
         }
     }
 
     async handleErrResponse(message: unknown): Promise<void> {
-        if (message.info === "Validation Needed.") {
+        const msg = message as Record<string, unknown>
+        if (msg.info === "Validation Needed.") {
             await this.publish("", this.encryptKey(this.key), DATA_CHANNEL_TYPE.VALIDATION)
         }
     }
@@ -430,7 +516,7 @@ class WebRTCDataChannelNetworkStatus {
         }
         try {
             const response = await this.publish("", data, DATA_CHANNEL_TYPE.RTC_INNER_REQ)
-            this.handleResponse(response.get("info"))
+            this.handleResponse((response as Record<string, unknown>).info)
         } catch (error) {
             console.error("Failed to publish:", error)
         }
@@ -438,7 +524,7 @@ class WebRTCDataChannelNetworkStatus {
 
     private handleResponse(info: unknown): void {
         console.log("Network status message received.")
-        const status = info.get("status")
+        const status = (info as Record<string, unknown>).status
         if (status === "Undefined" || status === "NetworkStatus.DISCONNECTED") {
             // Schedule the next network status request in 0.5s
             setTimeout(() => this.scheduleNetworkStatusRequest(), 500)
@@ -577,14 +663,14 @@ class WebRTCDataChannelFileDownloader {
             }
 
             // The complete data should be merged in the FutureResolver
-            const completeData = response.info?.file?.data
+            const completeData = (((response as Record<string, unknown>).info as Record<string, unknown>)?.file as Record<string, unknown>)?.data
 
             if (!completeData) {
                 throw new Error("Failed to get the file data.")
             }
 
             // Decode from base64
-            const decodedData = Uint8Array.from(atob(completeData), (c) => c.charCodeAt(0))
+            const decodedData = Uint8Array.from(atob(completeData as string), (c) => c.charCodeAt(0))
 
             if (progressCallback) {
                 progressCallback(100)
@@ -621,8 +707,8 @@ class WebRTCDataChannelRTCInnerReq {
     }
 
     handleResponse(msg: unknown): void {
-        const info = msg.info
-        const reqType = info?.req_type
+        const info = (msg as Record<string, unknown>).info
+        const reqType = (info as Record<string, unknown>)?.req_type
         if (reqType === "rtt_probe_send_from_mechine") {
             this.probeRes.handleResponse(info)
         }
@@ -692,7 +778,7 @@ function getErrorSourceText(errorSource: number): string {
 }
 
 function handle_error(message: unknown) {
-    const data = message.data
+    const data = (message as Record<string, unknown>).data as [number, number, number][]
 
     for (const error of data) {
         const [timestamp, errorSource, errorCodeInt] = error
@@ -785,7 +871,7 @@ export class WebRTCDataChannel {
     }
 
     async handle_response(msg: unknown) {
-        const msg_type = msg.type
+        const msg_type = (msg as Record<string, unknown>).type
 
         if (msg_type === DATA_CHANNEL_TYPE.VALIDATION) {
             await this.validation.handleResponse(msg)
@@ -794,7 +880,7 @@ export class WebRTCDataChannel {
         } else if (msg_type === DATA_CHANNEL_TYPE.HEARTBEAT) {
             this.heartbeat.handleResponse(msg)
         } else if (
-            [DATA_CHANNEL_TYPE.ERRORS, DATA_CHANNEL_TYPE.ADD_ERROR, DATA_CHANNEL_TYPE.RM_ERROR].includes(msg_type)
+            msg_type === DATA_CHANNEL_TYPE.ERRORS || msg_type === DATA_CHANNEL_TYPE.ADD_ERROR || msg_type === DATA_CHANNEL_TYPE.RM_ERROR
         ) {
             handle_error(msg)
         } else if (msg_type === DATA_CHANNEL_TYPE.ERR) {
@@ -868,7 +954,7 @@ export class WebRTCDataChannel {
             instruction: enable ? "on" : "off",
         }
         const response = await this.pub_sub.publish("", data, DATA_CHANNEL_TYPE.RTC_INNER_REQ)
-        if (response.info?.execution === "ok") {
+        if (((response as Record<string, unknown>).info as Record<string, unknown>)?.execution === "ok") {
             console.log(`DisableTrafficSavings: ${data.instruction}`)
             return true
         }
