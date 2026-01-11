@@ -1,4 +1,4 @@
-import { AUDIO_API } from './constants';
+import { AUDIO_API } from '../constants';
 import { WebRTCDataChannel } from './webrtc_datachannel';
 import { UnitreeWebRTCConnection } from './webrtc_driver';
 

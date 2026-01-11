@@ -1,6 +1,6 @@
-import { DATA_CHANNEL_TYPE } from './constants';
-import { print_status, get_nested_field, generate_md5, generate_uuid } from './util';
-import { UnifiedLidarDecoder } from './lidar_decoder';
+import { DATA_CHANNEL_TYPE } from '../constants';
+import { print_status, get_nested_field, generate_md5, generate_uuid } from '../core/util';
+import { UnifiedLidarDecoder } from '../lidar/lidar_decoder';
 
 // Future resolver for handling async responses
 class FutureResolver {

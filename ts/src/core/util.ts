@@ -1,4 +1,4 @@
-import { make_remote_request } from './unitree_auth';
+import { make_remote_request } from '../auth/unitree_auth';
 import { rsa_encrypt, rsa_load_public_key, aes_decrypt, generate_aes_key } from './encryption';
 import * as forge from 'node-forge';
 

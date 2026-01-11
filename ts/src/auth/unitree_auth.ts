@@ -1,6 +1,6 @@
 import CryptoJS from 'crypto-js';
 import * as forge from 'node-forge';
-import { aes_encrypt, generate_aes_key, rsa_encrypt, aes_decrypt, rsa_load_public_key } from './encryption';
+import { aes_encrypt, generate_aes_key, rsa_encrypt, aes_decrypt, rsa_load_public_key } from '../core/encryption';
 
 export function decrypt_con_notify_data(encrypted_b64: string): string {
     const key = new Uint8Array([232, 86, 130, 189, 22, 84, 155, 0, 142, 4, 166, 104, 43, 179, 235, 227]);
