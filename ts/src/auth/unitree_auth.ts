@@ -3,6 +3,9 @@ import * as forge from "node-forge"
 import { webcrypto } from "crypto"
 import { aes_encrypt, generate_aes_key, rsa_encrypt, aes_decrypt, rsa_load_public_key } from "../core/encryption"
 
+const isBrowser = typeof window !== 'undefined'
+const cryptoAPI = isBrowser ? globalThis.crypto : webcrypto
+
 export async function decrypt_con_notify_data(encrypted_b64: string): Promise<string> {
     try {
         // Decode base64
@@ -20,21 +23,30 @@ export async function decrypt_con_notify_data(encrypted_b64: string): Promise<st
         // Hardcoded key from Python code
         const keyBytes = new Uint8Array([232, 86, 130, 189, 22, 84, 155, 0, 142, 4, 166, 104, 43, 179, 235, 227])
 
-        // Import key for AES-GCM
-        const key = await webcrypto.subtle.importKey("raw", keyBytes, { name: "AES-GCM" }, false, ["decrypt"])
+        // Use Web Crypto API for AES-GCM decryption
+        const key = await (cryptoAPI as any).subtle.importKey(
+            "raw",
+            keyBytes,
+            { name: "AES-GCM" },
+            false,
+            ["decrypt"]
+        )
 
-        // Decrypt using AES-GCM
-        const decrypted = await webcrypto.subtle.decrypt(
+        const encrypted = new Uint8Array([...ciphertext, ...tag])
+
+        const decrypted = await (cryptoAPI as any).subtle.decrypt(
             {
                 name: "AES-GCM",
                 iv: nonce,
-                tagLength: 128, // 16 bytes * 8
+                tagLength: 128
             },
             key,
-            new Uint8Array([...ciphertext, ...tag]) // Combine ciphertext and tag
+            encrypted
         )
 
-        return new TextDecoder().decode(decrypted)
+        const result = new TextDecoder().decode(decrypted)
+        console.log('Decrypted data:', result)
+        return result
     } catch (error) {
         console.error("AES-GCM decryption failed:", error)
         throw new Error("AES-GCM decryption failed")
@@ -208,7 +220,7 @@ export async function send_sdp_to_local_peer(ip: string, sdp: string): Promise<s
 
 async function send_sdp_to_local_peer_old_method(ip: string, sdp: string): Promise<string | null> {
     try {
-        const url = `http://${ip}:8081/offer`
+        const url = isBrowser ? '/offer' : `http://${ip}:8081/offer`
 
         const headers = { "Content-Type": "application/json" }
 
@@ -229,7 +241,7 @@ async function send_sdp_to_local_peer_old_method(ip: string, sdp: string): Promi
 
 async function send_sdp_to_local_peer_new_method(ip: string, sdp: string): Promise<string | null> {
     try {
-        const url = `http://${ip}:9991/con_notify`
+        const url = isBrowser ? '/con_notify' : `http://${ip}:9991/con_notify`
 
         const response = await make_local_request(url)
 
@@ -259,7 +271,7 @@ async function send_sdp_to_local_peer_new_method(ip: string, sdp: string): Promi
                 data2: rsa_encrypt(aes_key, public_key),
             }
 
-            const url2 = `http://${ip}:9991/con_ing_${path_ending}`
+            const url2 = isBrowser ? `/con_ing_${path_ending}` : `http://${ip}:9991/con_ing_${path_ending}`
 
             const headers = { "Content-Type": "application/x-www-form-urlencoded" }
 

@@ -357,7 +357,7 @@ class WebRTCDataChannelPubSub {
 class WebRTCDataChannelHeartBeat {
     private channel: RTCDataChannel
     private publish: (topic: string, data: unknown, type: string) => void
-    private heartbeatTimer: number | null = null
+    private heartbeatTimer: ReturnType<typeof setInterval> | null = null
     private heartbeatResponse: unknown = null
 
     constructor(channel: RTCDataChannel, pub_sub: WebRTCDataChannelPubSub) {
@@ -370,7 +370,7 @@ class WebRTCDataChannelHeartBeat {
     }
 
     startHeartbeat(): void {
-        this.heartbeatTimer = window.setInterval(() => {
+        this.heartbeatTimer = setInterval(() => {
             this.sendHeartbeat()
         }, 2000)
     }
@@ -428,6 +428,11 @@ class WebRTCDataChannelValidation {
             this.channel.dispatchEvent(new Event("open"))
             this.key = msg.data as string
             await this.publish("", this.encryptKey(this.key), DATA_CHANNEL_TYPE.VALIDATION)
+            // Consider validation successful after exchange
+            console.log("Validation exchange completed")
+            for (const callback of this.onValidateCallbacks) {
+                callback()
+            }
         }
     }
 
@@ -477,7 +482,7 @@ class WebRTCDataChannelNetworkStatus {
     private conn: unknown
     private channel: RTCDataChannel
     private publish: (topic: string, data: unknown, type: string) => Promise<unknown>
-    private networkTimer: number | null = null
+    private networkTimer: ReturnType<typeof setInterval> | null = null
     private networkStatus: string = ""
     private onNetworkStatusCallbacks: ((mode: string) => void)[] = []
 
@@ -494,7 +499,7 @@ class WebRTCDataChannelNetworkStatus {
     }
 
     startNetworkStatusFetch(): void {
-        this.networkTimer = window.setInterval(() => {
+        this.networkTimer = setInterval(() => {
             this.scheduleNetworkStatusRequest()
         }, 1000)
     }

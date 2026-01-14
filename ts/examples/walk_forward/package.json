@@ -1,0 +1,12 @@
+{
+    "name": "unitree-walk-forward-example",
+    "version": "1.0.0",
+    "description": "Walk forward example for Unitree WebRTC connection",
+    "scripts": {
+        "build": "cd ../.. && npm run build",
+        "start": "npm run build && node walk_forward.js"
+    },
+    "dependencies": {
+        "wrtc": "^0.4.7"
+    }
+}

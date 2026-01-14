@@ -45,8 +45,9 @@ export function generate_aes_key(): string {
 }
 
 export function rsa_load_public_key(pem_data: string): forge.pki.rsa.PublicKey {
-    const key_bytes = atob(pem_data)
-    return forge.pki.publicKeyFromPem(key_bytes)
+    const derBytes = Uint8Array.from(atob(pem_data), c => c.charCodeAt(0))
+    const asn1 = forge.asn1.fromDer(forge.util.createBuffer(derBytes))
+    return forge.pki.publicKeyFromAsn1(asn1)
 }
 
 export function rsa_encrypt(data: string, public_key: forge.pki.rsa.PublicKey): string {

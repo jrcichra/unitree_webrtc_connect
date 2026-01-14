@@ -122,9 +122,17 @@ export class UnitreeWebRTCConnection {
         const configuration = this.create_webrtc_configuration(turn_server_info)
         this.pc = new RTCPeerConnection(configuration)
 
+        this.video = new WebRTCVideoChannel(this.pc, null)
+        this.audio = new WebRTCAudioChannel(this.pc, null)
+
+        // Add transceivers in the order expected by the robot: video, audio, datachannel
+        this.pc.addTransceiver("video", { direction: "recvonly" })
+        this.pc.addTransceiver("audio", { direction: "sendrecv" })
+
         this.datachannel = new WebRTCDataChannel(this, this.pc)
-        this.audio = new WebRTCAudioChannel(this.pc, this.datachannel)
-        this.video = new WebRTCVideoChannel(this.pc, this.datachannel)
+
+        this.video.setDataChannel(this.datachannel)
+        this.audio.setDataChannel(this.datachannel)
 
         this.pc.onicegatheringstatechange = () => {
             if (!this.pc) return
@@ -224,7 +232,7 @@ export class UnitreeWebRTCConnection {
             throw new Error("Could not get SDP from the peer. Check if the Go2 is switched on")
         }
 
-        await this.datachannel.wait_datachannel_open()
+        await this.datachannel.wait_datachannel_open(15)
     }
 
     async get_answer_from_remote_peer(

@@ -3,23 +3,33 @@ import { WebRTCDataChannel } from '../webrtc_datachannel';
 // Audio channel implementation
 export class WebRTCAudioChannel {
     pc: RTCPeerConnection;
-    datachannel: WebRTCDataChannel;
+    datachannel: WebRTCDataChannel | null = null;
     track_callbacks: ((frame: any) => Promise<void>)[] = [];
     audioContext: AudioContext | null = null;
     source: MediaStreamAudioSourceNode | null = null;
     processor: ScriptProcessorNode | null = null;
     audioTrack: MediaStreamTrack | null = null;
 
-    constructor(pc: RTCPeerConnection, datachannel: WebRTCDataChannel) {
+    constructor(pc: RTCPeerConnection, datachannel: WebRTCDataChannel | null = null) {
         this.pc = pc;
         this.datachannel = datachannel;
 
-        // Add audio transceiver
-        this.pc.addTransceiver("audio", { direction: "sendrecv" });
+        // Note: transceiver will be added in the driver to control order
+    }
+
+    setDataChannel(datachannel: WebRTCDataChannel): void {
+        this.datachannel = datachannel;
     }
 
     async setupAudioProcessing(track: MediaStreamTrack): Promise<void> {
         this.audioTrack = track;
+
+        // Check if AudioContext is available (browser environment)
+        if (typeof AudioContext === 'undefined') {
+            console.log("AudioContext not available, skipping audio processing");
+            return;
+        }
+
         this.audioContext = new AudioContext();
         const stream = new MediaStream([track]);
         this.source = this.audioContext.createMediaStreamSource(stream);
@@ -73,7 +83,9 @@ export class WebRTCAudioChannel {
     }
 
     switchAudioChannel(enable: boolean): void {
-        this.datachannel.switchAudioChannel(enable);
+        if (this.datachannel) {
+            this.datachannel.switchAudioChannel(enable);
+        }
     }
 
     close(): void {

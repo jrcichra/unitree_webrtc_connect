@@ -2,19 +2,24 @@ import { WebRTCDataChannel } from '../webrtc_datachannel';
 
 export class WebRTCVideoChannel {
     pc: RTCPeerConnection;
-    datachannel: WebRTCDataChannel;
+    datachannel: WebRTCDataChannel | null = null;
     track_callbacks: ((track: MediaStreamTrack) => Promise<void>)[] = [];
 
-    constructor(pc: RTCPeerConnection, datachannel: WebRTCDataChannel) {
+    constructor(pc: RTCPeerConnection, datachannel: WebRTCDataChannel | null = null) {
         this.pc = pc;
         this.datachannel = datachannel;
 
-        // Add video transceiver for receiving only
-        this.pc.addTransceiver("video", { direction: "recvonly" });
+        // Note: transceiver will be added in the driver to control order
+    }
+
+    setDataChannel(datachannel: WebRTCDataChannel): void {
+        this.datachannel = datachannel;
     }
 
     switchVideoChannel(enable: boolean): void {
-        this.datachannel.switchVideoChannel(enable);
+        if (this.datachannel) {
+            this.datachannel.switchVideoChannel(enable);
+        }
     }
 
     add_track_callback(callback: (track: MediaStreamTrack) => Promise<void>): void {
